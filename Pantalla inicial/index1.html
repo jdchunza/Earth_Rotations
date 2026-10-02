@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TerraQuake</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="left-panel">
+        <div class="brand"><span class="dot"></span> TerraQuake </div>
+
+        <h1>Sismos en las últimas <span>24 horas</span></h1>
+
+        <p class="subtitle">
+          Monitorea los movimientos telúricos ocurridos en el mundo durante las últimas 24 horas y explora la actividad sísmica desde una vista global del planeta.
+        </p>
+
+        <div class="actions">
+          <button id="startSimulationBtn" class="btn primary">Ver mapa global</button>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <strong>1,482</strong>
+            <span>Sismos</span>
+          </div>
+          <div class="stat">
+            <strong>6.8</strong>
+            <span>Máx. magnitud</span>
+          </div>
+          <div class="stat">
+            <strong>18</strong>
+            <span>Regiones</span>
+          </div>
+        </div>
+      </section>
+
+      <aside class="right-panel">
+        <div class="visual">
+          <div class="orbit"></div>
+          <div class="orbit orbit-2"></div>
+          <div class="orbit orbit-3"></div>
+          <div class="planet"></div>
+          <div class="moon"></div>
+
+          <div class="card">
+            <div class="card-row">
+              <div>
+                <div class="label">Último evento</div>
+                <div class="value">Chile • M 5.4 • 08:42 UTC</div>
+              </div>
+              <div class="pulse">Activo</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+    <script src="script.js"></script>
+  </body>
+</html>

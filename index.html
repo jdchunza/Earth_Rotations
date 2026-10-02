@@ -2,16 +2,40 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Planeta Tierra :) </title>
+  <title>Earth Rotations</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    html,body { height:100%; margin:0; background:#000; font-family:system-ui; overflow:hidden; }
+    html,body { height:100%; margin:0; background:#000; font-family:system-ui, sans-serif; overflow:hidden; }
     #container { width:100%; height:100vh; position:relative; }
     canvas { display:block; width:100%; height:100%; }
     .ui {
       position:absolute; right:16px; top:16px; z-index:10;
       display:flex; flex-direction:column; gap:8px;
     }
+    .country-picker {
+      position:absolute; left:50%; top:18px; z-index:10;
+      transform:translateX(-50%); width:min(360px, calc(100% - 32px));
+      display:flex; gap:8px; align-items:center;
+      padding:10px; background:rgba(5, 15, 28, 0.82);
+      border:1px solid rgba(255,255,255,0.16); border-radius:10px;
+      backdrop-filter:blur(8px);
+    }
+    .country-picker label { color:#b9d8e8; font-size:12px; white-space:nowrap; }
+    #countrySelect { min-width:0; flex:1; padding:8px; color:#fff; background:#102334; border:1px solid #31536a; border-radius:6px; }
+    .earthquake-panel {
+      position:absolute; right:16px; bottom:16px; z-index:11;
+      width:min(390px, calc(100% - 32px)); max-height:min(58vh, 540px);
+      overflow:auto; padding:16px; color:#eef8ff;
+      background:rgba(5, 15, 28, 0.92); border:1px solid rgba(126, 211, 255, 0.28);
+      border-radius:10px; backdrop-filter:blur(10px);
+    }
+    .panel-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .panel-heading h2 { margin:0; font-size:18px; }
+    #closePanel { color:#fff; background:transparent; border:1px solid #31536a; border-radius:5px; cursor:pointer; padding:5px 8px; }
+    .earthquake-item { padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.1); }
+    .earthquake-item strong { color:#ffd166; }
+    .earthquake-item small { display:block; color:#b9d8e8; margin-top:4px; line-height:1.4; }
+    .panel-status { color:#b9d8e8; font-size:13px; }
     .ui button {
       background: rgba(255,255,255,0.08);
       color:#fff; border:1px solid rgba(255,255,255,0.12);
@@ -26,6 +50,22 @@
 </head>
 <body>
   <div id="container"></div>
+
+  <div class="country-picker">
+    <label for="countrySelect">Explorar país</label>
+    <select id="countrySelect">
+      <option value="">Cargando países...</option>
+    </select>
+  </div>
+
+  <aside id="earthquakePanel" class="earthquake-panel" hidden>
+    <div class="panel-heading">
+      <h2 id="panelTitle">Sismos recientes</h2>
+      <button id="closePanel" type="button" aria-label="Cerrar panel">Cerrar</button>
+    </div>
+    <p id="panelStatus" class="panel-status">Selecciona un país para consultar los datos.</p>
+    <div id="earthquakeList"></div>
+  </aside>
 
   <div class="ui" aria-hidden="true">
     <button id="leftBtn">◀︎ Left</button>
@@ -116,9 +156,8 @@
     let autoRotate = false;
 
     // initial tilt for nicer view
-    earthMesh.rotation.x = 0.4;
-    earthMesh.rotation.y = 0.4;
-    cloudMesh.rotation.x = 0.4;
+    earthGroup.rotation.x = 0.4;
+    earthGroup.rotation.y = 0.4;
 
     // Pointer handlers on canvas
     renderer.domElement.addEventListener('pointerdown', (e) => {
@@ -181,6 +220,7 @@
     document.getElementById('zoomInBtn').addEventListener('click', () => { cameraDistance = Math.max(minDistance, cameraDistance - 0.9); });
     document.getElementById('zoomOutBtn').addEventListener('click', () => { cameraDistance = Math.min(maxDistance, cameraDistance + 0.9); });
     document.getElementById('autoRotateBtn').addEventListener('click', () => {
+      if (earthquakePanelOpen) return;
       autoRotate = !autoRotate;
       document.getElementById('autoRotateBtn').textContent = autoRotate ? 'Auto Rotate: ON' : 'Toggle Auto Rotate';
     });
@@ -191,14 +231,133 @@
       document.getElementById('autoRotateBtn').textContent = 'Toggle Auto Rotate';
     });
 
+    const countrySelect = document.getElementById('countrySelect');
+    const earthquakePanel = document.getElementById('earthquakePanel');
+    const panelTitle = document.getElementById('panelTitle');
+    const panelStatus = document.getElementById('panelStatus');
+    const earthquakeList = document.getElementById('earthquakeList');
+    const API_URL = 'http://localhost:8080/api/earthquakes';
+    let earthquakePanelOpen = false;
+    let selectedCountry = null;
+
+    async function loadCountries() {
+      try {
+        const response = await fetch('http://localhost:8080/api/countries');
+        if (!response.ok) throw new Error('No se pudo cargar el catálogo');
+        const countries = await response.json();
+        countries.sort((a, b) => a.name.common.localeCompare(b.name.common));
+        countries.forEach((country) => {
+          if (!country.cca2 || !country.latlng || country.latlng.length < 2) return;
+          const option = document.createElement('option');
+          option.value = country.cca2;
+          option.textContent = country.name.common;
+          option.dataset.latitude = country.latlng[0];
+          option.dataset.longitude = country.latlng[1];
+          countrySelect.appendChild(option);
+        });
+        countrySelect.querySelector('option[value=""]').textContent = 'Selecciona un país';
+      } catch (error) {
+        countrySelect.innerHTML = '<option value="">No se pudo cargar el catálogo</option>';
+        panelStatus.textContent = 'No se pudo cargar el catálogo de países.';
+      }
+    }
+
+    function rotateToCountry(latitude, longitude) {
+      targetRotX = THREE.MathUtils.clamp(latitude * Math.PI / 180, -Math.PI / 2 + 0.1, Math.PI / 2 - 0.1);
+      targetRotY = -longitude * Math.PI / 180 - Math.PI / 2;
+      cameraDistance = 4.2;
+    }
+
+    function fitCountry(bounds, fallbackCountry, earthquakes) {
+      const eventLongitudes = earthquakes.map((earthquake) => earthquake.longitude);
+      const eventLatitudes = earthquakes.map((earthquake) => earthquake.latitude);
+      const minLongitude = eventLongitudes.length ? Math.min(...eventLongitudes) : bounds?.minLongitude ?? fallbackCountry.longitude;
+      const maxLongitude = eventLongitudes.length ? Math.max(...eventLongitudes) : bounds?.maxLongitude ?? fallbackCountry.longitude;
+      const minLatitude = bounds?.minLatitude ?? (eventLatitudes.length ? Math.min(...eventLatitudes) : fallbackCountry.latitude);
+      const maxLatitude = bounds?.maxLatitude ?? (eventLatitudes.length ? Math.max(...eventLatitudes) : fallbackCountry.latitude);
+      const centerLatitude = (minLatitude + maxLatitude) / 2;
+      const centerLongitude = (minLongitude + maxLongitude) / 2;
+      const span = Math.max(maxLatitude - minLatitude, maxLongitude - minLongitude);
+      targetRotX = THREE.MathUtils.clamp(centerLatitude * Math.PI / 180, -Math.PI / 2 + 0.1, Math.PI / 2 - 0.1);
+      targetRotY = -centerLongitude * Math.PI / 180 - Math.PI / 2;
+      cameraDistance = THREE.MathUtils.clamp(4.2 + span * 0.04, 4.2, 11);
+    }
+
+    function distanceInKm(first, second) {
+      const earthRadius = 6371;
+      const lat1 = first.latitude * Math.PI / 180;
+      const lat2 = second.latitude * Math.PI / 180;
+      const deltaLat = (second.latitude - first.latitude) * Math.PI / 180;
+      const deltaLon = (second.longitude - first.longitude) * Math.PI / 180;
+      const value = Math.sin(deltaLat / 2) ** 2
+        + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2;
+      return earthRadius * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+    }
+
+    function renderEarthquakes(earthquakes) {
+      earthquakeList.innerHTML = '';
+      if (!earthquakes.length) {
+        earthquakeList.innerHTML = '<p class="panel-status">No hay sismos cercanos en las últimas 24 horas.</p>';
+        return;
+      }
+      earthquakes.forEach((earthquake) => {
+        const item = document.createElement('article');
+        item.className = 'earthquake-item';
+        item.innerHTML = `<strong>Magnitud ${earthquake.magnitude.toFixed(1)}</strong> · ${earthquake.place || 'Ubicación desconocida'}<small>Profundidad: ${earthquake.depth.toFixed(1)} km · ${new Date(earthquake.occurredAt).toLocaleString()}</small>`;
+        earthquakeList.appendChild(item);
+      });
+    }
+
+    async function showCountryEarthquakes(country) {
+      earthquakePanel.hidden = false;
+      panelTitle.textContent = `Sismos en ${country.name}`;
+      panelStatus.textContent = 'Consultando los últimos sismos...';
+      earthquakeList.innerHTML = '';
+      try {
+        const [earthquakeResponse, boundsResponse] = await Promise.all([
+          fetch(`${API_URL}?country=${encodeURIComponent(country.code)}`),
+          fetch(`http://localhost:8080/api/countries/${encodeURIComponent(country.code)}/bounds`)
+        ]);
+        if (!earthquakeResponse.ok || !boundsResponse.ok) throw new Error('API no disponible');
+        const earthquakes = await earthquakeResponse.json();
+        const bounds = await boundsResponse.json();
+        fitCountry(bounds, country, earthquakes);
+        panelStatus.textContent = `${earthquakes.length} eventos encontrados en el país.`;
+        renderEarthquakes(earthquakes);
+      } catch (error) {
+        panelStatus.textContent = 'No se pudo conectar con Spring Boot. Comprueba que el backend esté activo.';
+      }
+    }
+
+    countrySelect.addEventListener('change', () => {
+      const option = countrySelect.selectedOptions[0];
+      if (!option.value) return;
+      earthquakePanelOpen = true;
+      autoRotate = false;
+      earthMesh.rotation.y = 0;
+      cloudMesh.rotation.y = 0;
+      document.getElementById('autoRotateBtn').textContent = 'Auto Rotate: OFF';
+      selectedCountry = {
+        name: option.textContent,
+        code: option.value,
+        latitude: Number(option.dataset.latitude),
+        longitude: Number(option.dataset.longitude)
+      };
+      rotateToCountry(selectedCountry.latitude, selectedCountry.longitude);
+      showCountryEarthquakes(selectedCountry);
+    });
+    document.getElementById('closePanel').addEventListener('click', () => {
+      earthquakePanel.hidden = true;
+      earthquakePanelOpen = false;
+      autoRotate = true;
+      document.getElementById('autoRotateBtn').textContent = 'Auto Rotate: ON';
+    });
+    loadCountries();
+
     // Animation loop
     const clock = new THREE.Clock();
     function animate() {
       const dt = clock.getDelta();
-
-      // subtle natural spin for earth & clouds
-      earthMesh.rotation.y += 0.02 * dt * 60 * 0.05;
-      cloudMesh.rotation.y += 0.025 * dt * 60 * 0.06;
 
       if (autoRotate) {
         targetRotY += 0.0018 * dt * 60;
