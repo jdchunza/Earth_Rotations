@@ -7,5 +7,7 @@ services:
     dockerContext: .
     healthCheckPath: /actuator/health
     envVars:
+      - key: PORT
+        value: "1573"
       - key: SPRING_DATA_MONGODB_URI
         sync: false

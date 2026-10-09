@@ -143,7 +143,7 @@ const panelStatus = document.getElementById('panelStatus');
 const earthquakeList = document.getElementById('earthquakeList');
 const API_BASE_URL = window.location.protocol === 'file:' ||
   ['localhost', '127.0.0.1'].includes(window.location.hostname)
-  ? 'http://localhost:8080'
+  ? 'http://localhost:1573'
   : '';
 const API_URL = `${API_BASE_URL}/api/earthquakes`;
 let earthquakePanelOpen = false;
