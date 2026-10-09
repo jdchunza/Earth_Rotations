@@ -5,7 +5,7 @@ services:
     plan: free
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    healthCheckPath: /actuator/health
+    healthCheckPath: /
     envVars:
       - key: PORT
         value: "1573"
