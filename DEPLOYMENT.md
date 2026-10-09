@@ -22,9 +22,9 @@ MongoDB Atlas; no uses `localhost` para la base de datos en producción.
    crear otro.
 2. Para crear uno nuevo, selecciona **New > Blueprint** y elige el repositorio.
    Render detectará `render.yaml` y definirá el servicio Docker.
-3. Cuando Render solicite `MONGODB_URI`, pega la URI completa de Atlas. Debe
-   incluir `/earth_rotations` antes de los parámetros de la URI. Es un secreto:
-   configúralo en Render, no lo escribas en el repositorio.
+3. Cuando Render solicite `SPRING_DATA_MONGODB_URI`, pega la URI completa de
+   Atlas. Debe incluir `/earth_rotations` antes de los parámetros de la URI. Es
+   un secreto: configúralo en Render, no lo escribas en el repositorio.
 4. Espera a que el despliegue quede **Live**. Render proporciona una URL
    pública `https://...onrender.com`.
 5. Abre esa URL para ver el mapa. La página inicial está en
